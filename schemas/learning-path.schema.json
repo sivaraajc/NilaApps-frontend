@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/learning-path.schema.json",
+  "title": "Learning Path Save Payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "status", "nodes", "edges"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 150 },
+    "description": { "type": "string", "maxLength": 1000 },
+    "status": { "type": "string", "enum": ["draft", "published"] },
+    "version": { "type": "integer", "minimum": 1 },
+    "canvas": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "zoom": { "type": "number", "minimum": 0.1, "maximum": 4 },
+        "offsetX": { "type": "number" },
+        "offsetY": { "type": "number" }
+      }
+    },
+    "nodes": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/node" } },
+    "edges": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/edge" } }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "componentId", "type", "label", "position"],
+      "properties": {
+        "id": { "type": "string" },
+        "componentId": { "type": "string" },
+        "type": { "type": "string", "enum": ["start", "unit", "assessment", "end"] },
+        "label": { "type": "string" },
+        "description": { "type": "string" },
+        "position": {
+          "type": "object",
+          "required": ["x", "y"],
+          "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+        },
+        "config": { "type": "object" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sourceNodeId", "targetNodeId", "conditions"],
+      "properties": {
+        "id": { "type": "string" },
+        "sourceNodeId": { "type": "string" },
+        "targetNodeId": { "type": "string" },
+        "label": { "type": "string" },
+        "priority": { "type": "integer" },
+        "isDefault": { "type": "boolean" },
+        "conditions": { "type": "object" }
+      }
+    }
+  }
+}

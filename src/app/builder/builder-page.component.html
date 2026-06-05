@@ -1,0 +1,668 @@
+<div class="app-shell">
+  <header class="top-bar">
+    <div class="brand">
+      <span class="brand-icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+      </span>
+      <div>
+        <h1>Adaptive Learning Path Builder</h1>
+        <p>Create conditional quiz flows with adaptive sections.</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <div class="mode-toggle">
+        <button
+          type="button"
+          class="mode-btn"
+          [class.active]="state.viewMode() === 'builder'"
+          (click)="state.viewMode.set('builder')"
+        >
+          Builder
+        </button>
+        <button
+          type="button"
+          class="mode-btn"
+          [class.active]="state.viewMode() === 'preview'"
+          (click)="state.viewMode.set('preview')"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          Preview
+        </button>
+      </div>
+      <button type="button" class="btn outline" (click)="saveDraft()" [disabled]="isPreview()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+          <polyline points="17 21 17 13 7 13 7 21" />
+          <polyline points="7 3 7 8 15 8" />
+        </svg>
+        Save Draft
+      </button>
+      <button type="button" class="btn publish" (click)="publish()" [disabled]="isPreview()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="5 3 19 12 5 21 5 3" />
+        </svg>
+        Publish
+      </button>
+    </div>
+  </header>
+
+  @if (state.saveMessage()) {
+    <div class="toast">{{ state.saveMessage() }}</div>
+  }
+  @if (loadError) {
+    <div class="toast error">{{ loadError }}</div>
+  }
+
+  <div class="workspace" [class.preview-mode]="isPreview()">
+    <aside class="panel left-panel">
+      <div class="panel-header">
+        <h2>Add Components</h2>
+      </div>
+      <div
+        class="palette-list"
+        cdkDropList
+        id="palette"
+        [cdkDropListConnectedTo]="isPreview() ? [] : ['canvas']"
+        [cdkDropListDisabled]="isPreview()"
+      >
+        @if (loading) {
+          <p class="muted">Loading path...</p>
+        }
+        @for (item of paletteItems; track item.kind) {
+          <article
+            class="palette-card"
+            [class.section]="item.kind === 'section'"
+            [class.group]="item.kind === 'group'"
+            cdkDrag
+            [cdkDragDisabled]="isPreview()"
+            [cdkDragData]="item"
+            (cdkDragStarted)="state.clearSelection()"
+          >
+            <span class="palette-icon" [class.section]="item.kind === 'section'" [class.group]="item.kind === 'group'">
+              @if (item.kind === 'section') {
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <rect x="7" y="7" width="10" height="10" rx="1" />
+                </svg>
+              } @else {
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                  <polyline points="2 17 12 22 22 17" />
+                  <polyline points="2 12 12 17 22 12" />
+                </svg>
+              }
+            </span>
+            <div class="palette-body">
+              <h3>{{ item.label }}</h3>
+              <p>{{ item.description }}</p>
+            </div>
+          </article>
+        }
+      </div>
+
+      <div class="content-section">
+        <div class="content-section-header">
+          <h3>Available Content</h3>
+          <span class="content-count">{{ components.length }}</span>
+        </div>
+        <input
+          class="search"
+          type="search"
+          placeholder="Search content..."
+          [(ngModel)]="contentSearch"
+          (ngModelChange)="filterComponents()"
+          [disabled]="isPreview()"
+        />
+        <div class="content-list">
+          @for (item of filteredComponents; track item.id) {
+            <article
+              class="content-card"
+              [class.assessment]="item.type === 'assessment'"
+              cdkDrag
+              [cdkDragDisabled]="isPreview()"
+              [cdkDragData]="item"
+              (cdkDragStarted)="state.clearSelection()"
+            >
+              <div class="content-card-top">
+                <span class="type-badge" [class.assessment]="item.type === 'assessment'">
+                  {{ item.type === 'assessment' ? 'Assessment' : 'Unit' }}
+                </span>
+                <span class="duration">{{ item.approximateDurationMinutes }} min</span>
+              </div>
+              <h4>{{ item.title }}</h4>
+              <p>{{ item.shortDescription }}</p>
+            </article>
+          }
+        </div>
+      </div>
+
+      <div class="info-box">
+        <h4>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+          How it works
+        </h4>
+        <p>
+          Add sections to your flow, then add groups to create conditional routing based on scores.
+        </p>
+      </div>
+
+      <div class="example-tree">
+        <h4>Example: SAT Adaptive Test</h4>
+        <ul>
+          <li>Math Module 1 (Regular section)</li>
+          <li class="branch">Math Module 2 (Group)</li>
+          <li class="branch indent">├─ Easy Version (If score &lt; 50%)</li>
+          <li class="branch indent">└─ Advanced (If score ≥ 50%)</li>
+        </ul>
+      </div>
+    </aside>
+
+    <main class="canvas-wrap">
+      <div class="canvas-toolbar">
+        <span class="canvas-title">{{ state.pathName() }}</span>
+        @if (state.connectFromNodeId()) {
+          <span class="connect-hint">Click a target node to connect</span>
+        }
+      </div>
+
+      <div
+        #canvasEl
+        class="canvas-surface"
+        cdkDropList
+        id="canvas"
+        [cdkDropListConnectedTo]="isPreview() ? [] : ['palette']"
+        [cdkDropListDisabled]="isPreview()"
+        (cdkDropListDropped)="onCanvasDrop($event)"
+        (click)="onCanvasClick($event)"
+      >
+        <div class="canvas-float-zoom">
+          <button type="button" class="zoom-btn" (click)="zoomOut()" title="Zoom out">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8" /><line x1="8" y1="11" x2="14" y2="11" />
+            </svg>
+          </button>
+          <span class="zoom-label">{{ zoomPercent() }}%</span>
+          <button type="button" class="zoom-btn" (click)="zoomIn()" title="Zoom in">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" />
+            </svg>
+          </button>
+          <button type="button" class="zoom-btn fit" (click)="fitCanvas()" title="Fit to screen">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="canvas-inner" [style.transform]="canvasTransform()" [style.transform-origin]="'0 0'">
+          <svg class="edges-layer" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker
+                id="arrow"
+                viewBox="0 0 10 10"
+                refX="9"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#6b7280" />
+              </marker>
+              <marker
+                id="arrow-selected"
+                viewBox="0 0 10 10"
+                refX="9"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb" />
+              </marker>
+              <marker
+                id="arrow-conditional"
+                viewBox="0 0 10 10"
+                refX="9"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b82f6" />
+              </marker>
+            </defs>
+            @for (edge of state.edges(); track edge.id) {
+              <g
+                class="edge-group"
+                [class.selected]="isEdgeSelected(edge.id)"
+                [class.conditional]="isConditionalEdge(edge)"
+              >
+                <path
+                  [attr.d]="getEdgePath(edge)"
+                  class="edge-path"
+                  [class.dashed]="isConditionalEdge(edge)"
+                  [attr.marker-end]="
+                    isEdgeSelected(edge.id)
+                      ? 'url(#arrow-selected)'
+                      : isConditionalEdge(edge)
+                        ? 'url(#arrow-conditional)'
+                        : 'url(#arrow)'
+                  "
+                  (click)="onEdgeClick($event, edge.id)"
+                />
+              </g>
+            }
+          </svg>
+
+          @for (node of state.nodes(); track node.id) {
+            <div
+              class="canvas-node"
+              [class.selected]="isNodeSelected(node.id)"
+              [class.start]="node.type === 'start'"
+              [class.end]="node.type === 'end'"
+              [class.section]="isSectionNode(node)"
+              [class.group]="isGroupNode(node)"
+              cdkDrag
+              [cdkDragDisabled]="isPreview()"
+              cdkDragBoundary=".canvas-inner"
+              [style.transform]="nodeTransform(node)"
+              (cdkDragEnded)="onNodeDragEnd(node, $event)"
+              (click)="onNodeClick($event, node)"
+            >
+              @if (node.type !== 'start' && node.type !== 'end') {
+                <span class="port port-top"></span>
+              }
+
+              @if (node.type === 'start' || node.type === 'end') {
+                <div class="pill-content">
+                  @if (node.type === 'start') {
+                    <span class="pill-icon start-icon">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                    </span>
+                  }
+                  <strong>{{ node.label }}</strong>
+                  @if (node.type === 'end') {
+                    <span class="pill-icon end-icon">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                      </svg>
+                    </span>
+                  }
+                </div>
+              } @else if (isGroupNode(node)) {
+                <span class="group-badge">Group</span>
+                <div class="node-header">
+                  <span class="node-icon group">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                      <polyline points="2 17 12 22 22 17" />
+                    </svg>
+                  </span>
+                  <span class="node-type">Group</span>
+                  @if (!isPreview()) {
+                    <button
+                      type="button"
+                      class="icon-btn group-btn"
+                      title="Connect from this node"
+                      (click)="startConnection($event, node.id)"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="7" y1="17" x2="17" y2="7" />
+                        <polyline points="7 7 17 7 17 17" />
+                      </svg>
+                    </button>
+                  }
+                </div>
+                <strong>{{ node.label }}</strong>
+                @if (node.description) {
+                  <span class="node-meta group-desc">{{ node.description }}</span>
+                }
+                <span class="port port-bottom"></span>
+              } @else {
+                <div class="node-header">
+                  <span class="node-icon section">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <rect x="7" y="7" width="10" height="10" rx="1" />
+                    </svg>
+                  </span>
+                  <span class="node-type">Section</span>
+                  @if (!isPreview()) {
+                    <button
+                      type="button"
+                      class="icon-btn"
+                      title="Connect from this node"
+                      (click)="startConnection($event, node.id)"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="7" y1="17" x2="17" y2="7" />
+                        <polyline points="7 7 17 7 17 17" />
+                      </svg>
+                    </button>
+                  }
+                </div>
+                <strong>{{ node.label }}</strong>
+                @if (nodeMetaLine(node); as meta) {
+                  <span class="node-meta">{{ meta }}</span>
+                }
+                <span class="port port-bottom"></span>
+              }
+            </div>
+          }
+        </div>
+
+        @if (isPreview()) {
+          <div class="preview-banner">Preview mode — editing disabled</div>
+        }
+      </div>
+    </main>
+
+    <aside class="panel right-panel">
+      <div class="panel-header">
+        <h2>Properties</h2>
+        @if (state.selectedNode(); as node) {
+          <span class="prop-type">{{ panelTypeLabel(node) }}</span>
+        }
+        @if (state.selectedEdge()) {
+          <span class="prop-type">Connection</span>
+        }
+      </div>
+
+      @if (!state.selection()) {
+        <div class="empty-props">
+          <p>Select a node or connection on the canvas to edit properties.</p>
+          <label>Path name</label>
+          <input
+            [ngModel]="state.pathName()"
+            (ngModelChange)="state.pathName.set($event)"
+            [readonly]="isPreview()"
+          />
+          <label>Description</label>
+          <textarea
+            rows="4"
+            [ngModel]="state.pathDescription()"
+            (ngModelChange)="state.pathDescription.set($event)"
+            [readonly]="isPreview()"
+          ></textarea>
+          <label>Status</label>
+          <p class="status-line">{{ state.pathStatus() | titlecase }}</p>
+          @if (state.pathId()) {
+            <button type="button" class="btn ghost full" (click)="reload()" [disabled]="isPreview()">
+              Reload from server
+            </button>
+          }
+        </div>
+      }
+
+      @if (state.selectedNode(); as node) {
+        <div class="props-form">
+          @if (!isPreview() && node.type !== 'start' && node.type !== 'end') {
+            <button type="button" class="btn-icon-delete" title="Remove node" (click)="state.removeNode(node.id)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
+          }
+
+          <label>Label</label>
+          <input
+            [ngModel]="node.label"
+            (ngModelChange)="updateSelectedNodeLabel($event)"
+            [readonly]="isPreview()"
+          />
+          <label>Description</label>
+          <textarea
+            rows="3"
+            placeholder="Enter description"
+            [ngModel]="node.description ?? ''"
+            (ngModelChange)="updateSelectedNodeDescription($event)"
+            [readonly]="isPreview()"
+          ></textarea>
+
+          @if (isSectionNode(node)) {
+            <h3>Section Details</h3>
+            <div class="row">
+              <div>
+                <label>Questions</label>
+                <input
+                  type="number"
+                  [ngModel]="node.config?.questionCount ?? ''"
+                  (ngModelChange)="updateSelectedNodeQuestionCount(+$event)"
+                  [readonly]="isPreview()"
+                />
+              </div>
+              <div>
+                <label>Duration (min)</label>
+                <input
+                  type="number"
+                  [ngModel]="node.config?.approximateDurationMinutes ?? ''"
+                  (ngModelChange)="updateSelectedNodeDuration(+$event)"
+                  [readonly]="isPreview()"
+                />
+              </div>
+            </div>
+            <label>Difficulty</label>
+            <select
+              [ngModel]="node.config?.difficulty ?? 'medium'"
+              (ngModelChange)="updateSelectedNodeDifficulty($event)"
+              [disabled]="isPreview()"
+            >
+              @for (d of difficulties; track d) {
+                <option [value]="d">{{ d | titlecase }}</option>
+              }
+            </select>
+
+            @if (incomingEdgeForNode(node); as edge) {
+              <div class="rules-header">
+                <h3>Assignment Conditions</h3>
+                @if (!isPreview()) {
+                  <button type="button" class="btn ghost sm" (click)="addRuleForNode(node)">+ Add</button>
+                }
+              </div>
+              @for (rule of edge.conditions.rules; track rule.id; let i = $index) {
+                <div class="rule-card">
+                  <div class="rule-card-header">Condition {{ i + 1 }}</div>
+                  <label>Source Section</label>
+                  <select
+                    [ngModel]="rule.sourceNodeId"
+                    (ngModelChange)="updateNodeRuleSourceNode(node, rule, $event)"
+                    [disabled]="isPreview()"
+                  >
+                    @for (n of sourceSectionsForNode(node); track n.id) {
+                      <option [value]="n.id">{{ n.label }}</option>
+                    }
+                  </select>
+                  <div class="row">
+                    <div>
+                      <label>Operator</label>
+                      <select
+                        [ngModel]="rule.operator"
+                        (ngModelChange)="updateNodeRuleOperator(node, rule, $event)"
+                        [disabled]="isPreview()"
+                      >
+                        @for (op of operators; track op) {
+                          <option [value]="op">{{ formatOperator(op) }}</option>
+                        }
+                      </select>
+                    </div>
+                    <div>
+                      <label>Threshold</label>
+                      <input
+                        [ngModel]="rule.metric === 'score_range' ? (rule.range?.max ?? '') + '%' : (rule.value ?? '') + (rule.metric === 'score' ? '%' : '')"
+                        (ngModelChange)="updateNodeRuleValue(node, rule, $event)"
+                        [readonly]="isPreview()"
+                      />
+                    </div>
+                  </div>
+                  <div class="rule-summary">{{ ruleSummary(rule) }}</div>
+                  @if (!isPreview()) {
+                    <button type="button" class="btn danger sm" (click)="removeNodeRule(node, rule.id)">
+                      Remove condition
+                    </button>
+                  }
+                </div>
+              }
+            }
+          }
+
+          @if (parentGroupLabel(node); as parent) {
+            <div class="parent-group">
+              <span class="parent-label">Parent Group</span>
+              <span class="parent-value">{{ parent }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      @if (state.selectedEdge(); as edge) {
+        <div class="props-form">
+          @if (!isPreview()) {
+            <button type="button" class="btn-icon-delete" title="Remove connection" (click)="state.removeEdge(edge.id)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
+          }
+
+          <h3>Connection</h3>
+          <label>Label</label>
+          <input
+            [ngModel]="edge.label ?? ''"
+            (ngModelChange)="updateSelectedEdgeLabel($event)"
+            [readonly]="isPreview()"
+          />
+          <div class="row">
+            <div>
+              <label>Priority</label>
+              <input
+                type="number"
+                [ngModel]="edge.priority ?? 1"
+                (ngModelChange)="updateSelectedEdgePriority(+$event)"
+                [readonly]="isPreview()"
+              />
+            </div>
+            <div>
+              <label>Default path</label>
+              <select
+                [ngModel]="edge.isDefault ? 'yes' : 'no'"
+                (ngModelChange)="updateSelectedEdgeDefault($event === 'yes')"
+                [disabled]="isPreview()"
+              >
+                <option value="yes">Yes — linear</option>
+                <option value="no">No — conditional</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="rules-header">
+            <div>
+              <h3>Assignment Conditions</h3>
+              <p class="rules-hint">Define when this section should be shown to learners.</p>
+            </div>
+            @if (!isPreview()) {
+              <button type="button" class="btn ghost sm" (click)="addRule(edge)">+ Add</button>
+            }
+          </div>
+          <label>Combine rules with</label>
+          <select
+            [ngModel]="edge.conditions.operator"
+            (ngModelChange)="updateEdgeOperator($event)"
+            [disabled]="isPreview()"
+          >
+            <option value="AND">AND (all must match)</option>
+            <option value="OR">OR (any may match)</option>
+          </select>
+
+          @for (rule of edge.conditions.rules; track rule.id; let i = $index) {
+            <div class="rule-card">
+              <div class="rule-card-header">Condition {{ i + 1 }}</div>
+              <label>Source Section</label>
+              <select
+                [ngModel]="rule.sourceNodeId"
+                (ngModelChange)="updateRuleSourceNode(rule, $event)"
+                [disabled]="isPreview()"
+              >
+                @for (n of state.upstreamNodes(edge); track n.id) {
+                  <option [value]="n.id">{{ n.label }}</option>
+                }
+                <option [value]="edge.sourceNodeId">{{ sourceNodeLabel(edge.sourceNodeId) }}</option>
+              </select>
+              <div class="row">
+                <div>
+                  <label>Metric</label>
+                  <select
+                    [ngModel]="rule.metric"
+                    (ngModelChange)="updateRuleMetric(rule, $event)"
+                    [disabled]="isPreview()"
+                  >
+                    @for (m of metricsForEdge(edge); track m) {
+                      <option [value]="m">{{ formatMetric(m) }}</option>
+                    }
+                  </select>
+                </div>
+                <div>
+                  <label>Operator</label>
+                  <select
+                    [ngModel]="rule.operator"
+                    (ngModelChange)="updateRuleOperator(rule, $event)"
+                    [disabled]="isPreview()"
+                  >
+                    @for (op of operators; track op) {
+                      <option [value]="op">{{ formatOperator(op) }}</option>
+                    }
+                  </select>
+                </div>
+              </div>
+              @if (rule.metric === 'score_range') {
+                <label>Threshold</label>
+                <div class="row">
+                  <input
+                    type="number"
+                    placeholder="Min %"
+                    [ngModel]="rule.range?.min ?? 0"
+                    (ngModelChange)="updateRuleRangeMin(rule, +$event)"
+                    [readonly]="isPreview()"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max %"
+                    [ngModel]="rule.range?.max ?? 100"
+                    (ngModelChange)="updateRuleRangeMax(rule, +$event)"
+                    [readonly]="isPreview()"
+                  />
+                </div>
+              } @else {
+                <label>Threshold</label>
+                <input
+                  [ngModel]="rule.value"
+                  (ngModelChange)="updateRuleValue(rule, $event)"
+                  [readonly]="isPreview()"
+                />
+              }
+              <div class="rule-summary">{{ ruleSummary(rule) }}</div>
+              @if (!isPreview()) {
+                <button type="button" class="btn danger sm" (click)="state.removeRule(edge.id, rule.id)">
+                  Remove condition
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
+    </aside>
+  </div>
+</div>
